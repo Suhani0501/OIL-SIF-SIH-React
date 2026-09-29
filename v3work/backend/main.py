@@ -25,6 +25,7 @@ import joblib
 import numpy as np
 import pandas as pd
 from fastapi import Depends, FastAPI, HTTPException, Header
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -430,13 +431,22 @@ def normalize_role(role):
     key = ' '.join(str(role).strip().lower().split())
     return ROLE_MAP.get(key, role if role in ('Employee', 'HSE Officer', 'Management') else 'Employee')
 
-def current_user(authorization: str = Header(default='')):
-    if not authorization.startswith('Bearer '):
-        raise HTTPException(status_code=401, detail='Authentication required.')
-    token = authorization[7:].strip()
+security = HTTPBearer()
+
+
+def current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    token = credentials.credentials
+
     session = sessions.get(token)
+
     if not session:
-        raise HTTPException(status_code=401, detail='Session expired. Please sign in again.')
+        raise HTTPException(
+            status_code=401,
+            detail='Session expired. Please sign in again.'
+        )
+
     return session
 
 def require_role(*allowed_roles):
